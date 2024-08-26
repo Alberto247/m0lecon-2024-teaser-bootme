@@ -1,0 +1,1 @@
+gdb -ix realmode.txt -ex 'target remote localhost:1234' -ex 'b *0x7c2e'
