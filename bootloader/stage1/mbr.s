@@ -182,6 +182,18 @@ switch_to_stage2:
 	pop ecx
 	mov [mem_info], ecx
 
+	mov eax, 0x10000
+	mov edx, 0x9000
+	mov ebx, 0x2880
+	copyloopstart:
+	mov ecx, [edx]
+	mov [eax], ecx
+	add eax, 4
+	add edx, 4
+	sub ebx, 4
+	cmp ebx, 0
+	jg copyloopstart
+
 	xor eax, eax
 
 	mov ax, 10h 			; Save data segment identifyer
@@ -197,7 +209,7 @@ switch_to_stage2:
 	push eax
 	mov eax, mem_info
 	push eax
-	mov edx, 0x9000
+	mov edx, 0x10000
 	lea eax, [edx]
 	call eax				; stage2_main(mem_info, vid_info)
 

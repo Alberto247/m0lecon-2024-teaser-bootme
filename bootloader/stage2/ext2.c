@@ -33,6 +33,7 @@ find it.
 #include "ext2.h"
 #include "defs.h"
 
+int BLOCK_SIZE = 1024;
 
 // void stage2_main() {
 // 	//clear the screen
@@ -93,24 +94,31 @@ void* buffer_read(int block) {
 /* 	Read superblock from device dev, and check the magic flag.
 	Return NULL if not a valid EXT2 partition */
 superblock* ext2_superblock() {
+	int BLOCK_SIZE_OLD=BLOCK_SIZE; // I know, it's stupid, but it's late
+	BLOCK_SIZE=1024;
 	superblock* sb = buffer_read(EXT2_SUPER);
+	BLOCK_SIZE=BLOCK_SIZE_OLD;
 	if (sb->magic != EXT2_MAGIC)
 		return NULL;
 	return sb;
 }
 
 block_group_descriptor* ext2_blockdesc() {
-	return buffer_read(EXT2_SUPER + 1);
+	return buffer_read(BLOCK_SIZE==1024 ? EXT2_SUPER + 1 : EXT2_SUPER); // If BLOCK_SIZE is 1024, then the block group descriptor is the third block, otherwhise is the second (0-indexed)
 }
 
 inode* ext2_inode(int dev, int i) {
 	superblock* s = ext2_superblock();
-	if(!s){
+	if(s==NULL){
 		vga_puts("Invalid ext2 drive");
 		vga_putc('\n');
 		for (;;);
 	}
+	BLOCK_SIZE = 1024 << s->log_block_size; 
+	printx("BLOCK_SIZE@: ", BLOCK_SIZE);
+	printx("s->log_block_size@: ", s->log_block_size);
 	block_group_descriptor* bgd = ext2_blockdesc();
+	printx("block_group_descriptor@: ", bgd);
 
 	int block_group = (i - 1) / s->inodes_per_group; // block group #
 	int index 		= (i - 1) % s->inodes_per_group; // index into block group
@@ -211,6 +219,8 @@ int ext2_find_child(const char* name, int dir_inode) {
 		// Calculate the 4byte aligned size of each entry
 		calc = (sizeof(dirent) + d->name_len + 4) & ~0x3;
 		sum += d->rec_len;
+		vga_puts(d->name);
+		vga_putc('\n');
 		//printf("%2d  %10s\t%2d %3d\n", (int)d->inode, d->name, d->name_len, d->rec_len);
 		if (strncmp(d->name, name, d->name_len)== 0) {
 			

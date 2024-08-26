@@ -36,12 +36,10 @@ Each block group has a backup superblock as it's first block
 #ifndef __baremetal_ext2__
 #define __baremetal_ext2__
 
-#define BLOCK_SIZE		4096
 #define SECTOR_SIZE		512
 #define EXT2_BOOT		0			// Block 0 is bootblock
 #define EXT2_SUPER		1			// Block 1 is superblock
 #define EXT2_MAGIC		0x0000EF53
-
 
 
 typedef struct superblock_s {
@@ -119,7 +117,7 @@ typedef struct inode_s {
 	uint32_t osd2[3];
 } inode;
 
-#define INODE_SIZE (sizeof(inode))
+#define INODE_SIZE 256
 
 
 /*
@@ -137,7 +135,7 @@ typedef struct dirent_s {
 
 typedef struct ide_buffer {
 	uint32_t block;				// block number
-	uint8_t data[BLOCK_SIZE];	// 1 disk sector of data
+	uint8_t data[4096];	// 1 disk sector of data
 } buffer;
 
 
@@ -168,8 +166,8 @@ typedef struct ide_buffer {
 #define LBA_HIGH(c)		((uint8_t) (c >> 16) & 0xFF)
 #define LBA_LAST(c)		((uint8_t) (c >> 24) & 0xF)
 
-#define IDE_CMD_READ  (BLOCK_SIZE/SECTOR_SIZE == 1) ? 0x20 : 0xC4
-#define IDE_CMD_WRITE (BLOCK_SIZE/SECTOR_SIZE == 1) ? 0x30 : 0xC5
+#define IDE_CMD_READ  0xC4
+#define IDE_CMD_WRITE 0xC5
 #define IDE_CMD_READ_MUL  0xC4
 #define IDE_CMD_WRITE_MUL 0xC5
 
