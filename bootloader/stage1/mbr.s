@@ -264,6 +264,32 @@ vid_info:
 .mode	dd 0
 .array 	dd 0
 ; padding
+
+times 460 - ($-$$) db 0
+
+
+
+[bits 32]
+
+realmodereturn:
+	cli
+	mov sp, 0x10
+	mov ax, 10h
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	mov eax, cr0
+	and eax, 0x7ffffffe
+	mov cr0, eax
+	jmp word 08h:kernelstart
+[bits 16]
+kernelstart:
+	mov   sp, 0xe000
+	mov ax, 0x9000
+	mov ss, ax
+	jmp word	9020h:0
+
 times 510 - ($-$$) db 0
 
 ; magic number

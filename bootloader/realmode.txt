@@ -1,0 +1,41 @@
+# Special mode for GDB that allows to debug/disassemble REAL MODE x86 code
+#
+# It has been designed to be used with QEMU or BOCHS gdb-stub
+#
+# 08/2011 Hugo Mercier - GPL v3 license
+#
+# Freely inspired from "A user-friendly gdb configuration file" widely available
+# on the Internet
+
+set confirm off
+set verbose off
+set prompt \033[31mreal-mode-gdb$ \033[0m
+
+set output-radix 0d10
+set input-radix 0d10
+
+# These make gdb never pause in its output
+set height 0
+set width 0
+
+# Intel syntax
+set disassembly-flavor intel
+# Real mode
+set architecture i8086
+
+set $SHOW_CONTEXT = 1
+
+set $REAL_MODE = 1
+
+# By default A20 is present
+set $ADDRESS_MASK = 0x1FFFFF
+
+# nb of instructions to display
+set $CODE_SIZE = 10
+
+define enable-a20
+  set $ADDRESS_MASK = 0x1FFFFF
+end
+define disable-a20
+  set $ADDRESS_MASK = 0x0FFFFF
+end
