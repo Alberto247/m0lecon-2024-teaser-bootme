@@ -85,7 +85,7 @@ static void putpixel(unsigned char* screen, int x,int y, int color) {
 static void build_command_line(char *command_line, int auto_boot)
 {
 
-	strcpy(command_line, "console=ttyS0 root=/dev/sdb rootwait\0");
+	strcpy(command_line, "console=ttyS0 root=/dev/sdb rw rootwait\0");
 	// command_line[0] = '\0';
 
 	// strcat(command_line, "root=/dev/sda1 nokaslr");
