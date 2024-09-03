@@ -136,41 +136,132 @@ uint32_t ext2_read_indirect(uint32_t indirect, size_t block_num) {
 	return *(uint32_t*) ((uint32_t) data + block_num*4);
 }
 
-void* ext2_read_file(inode* in) {
+char *
+strstr(const char *s, const char *find)
+{
+	char c, sc;
+	size_t len;
+	size_t end = s+0x1000;
+	if ((c = *find++) != '\0') {
+		len = strlen(find);
+		do {
+			do {
+				sc = *s++;
+				if ((s>=end))
+					return (NULL);
+			} while (sc != c);
+		} while (strncmp(s, find, len) != 0);
+		s--;
+	}
+	return ((char *)s);
+}
+
+void* ext2_read_file(inode* in, int block_number, int block_offset, char* buff) {
 	assert(in);
 	if(!in)
 		return NULL;
 
 	int num_blocks = in->blocks / (BLOCK_SIZE/SECTOR_SIZE);	
 
+	printx("num_blocks: ", num_blocks);
+
 	assert(num_blocks != 0);
 	if (!num_blocks) 
 		return NULL;
+	
+	
+	if(block_offset<0){
+		block_offset=0;
+	}
 
+	if(block_number<=0 || block_number > num_blocks){
+		block_number=num_blocks;
+	}
+
+	assert(block_number+block_offset<=num_blocks); // Reading less or equal to what exists
 
 	size_t sz = BLOCK_SIZE*num_blocks;
-	void* buf = malloc(sz);
+	void* buf = buff;
+	if(buf==NULL){
+		buf = malloc(sz);
+	}
+
 	assert(buf != NULL);
 
 	int indirect = 0;
+
+	int doubleindirect = 0;
+
+	int tripleindirect = 0;
+
+	
 
 	/* Singly-indirect block pointer */
 	if (num_blocks > 12) {
 		indirect = in->block[12];
 	}
+	if (num_blocks > 12+BLOCK_SIZE/4) {
+		doubleindirect = in->block[13];
+	}
+
+	if (num_blocks > 12+(BLOCK_SIZE/4)*(BLOCK_SIZE/4)) {
+		tripleindirect = in->block[14];
+	}
+
+	num_blocks=block_number+block_offset; // Upper limit of our block
+
+	printx("indirect: ", indirect);
+	printx("doubleindirect: ", doubleindirect);
+	printx("tripleindirect: ", tripleindirect);
+
+	//for(;;);
 
 	int blocknum = 0;
+	int indirectblocknum = 0;
+	int indirectblockcache = -1;
+	int doubleindirectblocknum = 0;
+	int doubleindirectblockcache = -1;
+	int internal_offset = 0;
 	char* data;
-	for (int i = 0; i < num_blocks; i++) {
+	char needle[] = {'\xDB', '\xB5', '\x3D', '\xB4', '\xF0', '\x1D', '\x1A', '\xD3', '\0'};
+	for (int i = block_offset; i < num_blocks; i++) { // We read from the offset to offset+number
 		if (i < 12) {
 			blocknum = in->block[i];
 			char* data = buffer_read(blocknum);
-			memcpy((uint32_t) buf + (i * BLOCK_SIZE), data, BLOCK_SIZE);
+			memcpy((uint32_t) buf + ((i-block_offset) * BLOCK_SIZE), data, BLOCK_SIZE);
 		}
-		if (i > 12) {
-			blocknum = ext2_read_indirect(indirect, i-13);
+		if (i >= 12 && i<12+BLOCK_SIZE/4) {
+			blocknum = ext2_read_indirect(indirect, i-12);
 			char* data = buffer_read(blocknum);
-			memcpy((uint32_t) buf + ((i-1) * BLOCK_SIZE), data, BLOCK_SIZE);
+			memcpy((uint32_t) buf + (((i-block_offset)) * BLOCK_SIZE), data, BLOCK_SIZE);
+		}
+		if(i>=12+BLOCK_SIZE/4 && i<12+(BLOCK_SIZE/4)*(BLOCK_SIZE/4)){
+			internal_offset=(i-(12+BLOCK_SIZE/4));
+			if(internal_offset/(BLOCK_SIZE/4)!=indirectblockcache){
+				indirectblockcache=internal_offset/(BLOCK_SIZE/4);
+				indirectblocknum = ext2_read_indirect(doubleindirect, internal_offset/(BLOCK_SIZE/4));
+			}
+			blocknum = ext2_read_indirect(indirectblocknum, internal_offset%(BLOCK_SIZE/4));
+			char* data = buffer_read(blocknum);
+			memcpy((uint32_t) buf + (((i-block_offset)) * BLOCK_SIZE), data, BLOCK_SIZE);
+		}
+		if(i>=12+(BLOCK_SIZE/4)*(BLOCK_SIZE/4)){
+			internal_offset=(i-(12+BLOCK_SIZE/4+(BLOCK_SIZE/4)*(BLOCK_SIZE/4)));
+			if(internal_offset/((BLOCK_SIZE/4)*(BLOCK_SIZE/4))!=doubleindirectblockcache){
+				doubleindirectblockcache=internal_offset/((BLOCK_SIZE/4)*(BLOCK_SIZE/4));
+				doubleindirectblocknum = ext2_read_indirect(tripleindirect, internal_offset/((BLOCK_SIZE/4)*(BLOCK_SIZE/4)));
+			}
+			if((internal_offset%((BLOCK_SIZE/4)*(BLOCK_SIZE/4)))/(BLOCK_SIZE/4)!=indirectblockcache){
+				indirectblockcache=(internal_offset%((BLOCK_SIZE/4)*(BLOCK_SIZE/4)))/(BLOCK_SIZE/4);
+				indirectblocknum = ext2_read_indirect(doubleindirectblocknum, (internal_offset%((BLOCK_SIZE/4)*(BLOCK_SIZE/4)))/(BLOCK_SIZE/4));
+			}
+			blocknum = ext2_read_indirect(indirectblocknum, (internal_offset%((BLOCK_SIZE/4)*(BLOCK_SIZE/4)))%(BLOCK_SIZE/4));
+			char* data = buffer_read(blocknum);
+			if(memcmp(needle, data, 1)==0){
+				printx("find: ", i);
+				for(;;);
+			}
+			memcpy((uint32_t) buf + (((i-block_offset)) * BLOCK_SIZE), data, BLOCK_SIZE);
 		}
 
 	}

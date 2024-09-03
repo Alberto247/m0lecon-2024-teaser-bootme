@@ -173,7 +173,7 @@ typedef struct ide_buffer {
 
 extern block_group_descriptor* ext2_blockdesc();
 extern superblock* ext2_superblock();
-extern void* ext2_read_file(inode* in);
+void* ext2_read_file(inode* in, int block_number, int block_offset, char* buff);
 
 extern void vga_puts(char* s);
 

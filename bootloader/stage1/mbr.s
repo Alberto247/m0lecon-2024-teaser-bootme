@@ -9,18 +9,6 @@ start:
     ; setup stack
     mov bp, 0x9000
     mov sp, bp
-
-
-    mov ah, 0x0e
-    lea si, [welcome]
-    loop:
-        lodsb
-        test al, al
-        jz endwrite
-        int 0x10
-        jmp loop
-
-    endwrite:
     
     call load_stage2
     call video_map
@@ -63,7 +51,7 @@ disk_loop:
 
 load_stage2:
     mov bx, 0x9000 ; bx -> destination
-    mov dh, 20             ; dh -> num sectors
+    mov dh, 40             ; dh -> num sectors
     mov dl, [BOOT_DRIVE]  ; dl -> disk
     call disk_load
     ret
@@ -184,7 +172,7 @@ switch_to_stage2:
 
 	mov eax, 0x10000
 	mov edx, 0x9000
-	mov ebx, 0x2880
+	mov ebx, 0x5000
 	copyloopstart:
 	mov ecx, [edx]
 	mov [eax], ecx
@@ -203,7 +191,7 @@ switch_to_stage2:
 	mov fs, ax
 	mov gs, ax
 
-	mov esp, 0x00900000		; Move temp stack pointer to 090000h
+	mov esp, 0x00f00000		; Move temp stack pointer to 0f0000h
 
 	mov eax, vid_info
 	push eax
@@ -216,8 +204,6 @@ switch_to_stage2:
 
 ; boot drive variable
 BOOT_DRIVE db 0
-
-welcome db 'Booting ptm loader 0.1...', 0Ah, 0
 
 ;==============================================================================
 ; GLOBAL DESCRIPTOR TABLE
@@ -242,6 +228,7 @@ gdt_kernel_code:
 	dw 0		; Base 0:15
 	db 0		; Base 16:23
 	db 09Ah 	; Present, Ring 0, Code, Non-conforming, Readable
+
 	db 0CFh		; Page-granular
 	db 0 		; Base 24:31
 
@@ -254,6 +241,24 @@ gdt_kernel_data:
 	db 0CFh		; Page-granular
 	db 0 		; Base 24:31
 
+gdt16_code:
+    ; 16-bit 4gb flat r/w/executable code descriptor
+    dw 0xFFFF                   ; limit low
+    dw 0                        ; base low
+    db 0                        ; base middle
+    db 10011010b                ; access
+    db 10001111b                ; granularity
+    db 0                        ; base high
+
+gdt16_data:
+    ; 16-bit 4gb flat r/w data descriptor
+    dw 0xFFFF                   ; limit low
+    dw 0                        ; base low
+    db 0                        ; base middle
+    db 10010010b                ; access
+    db 10001111b                ; granularity
+    db 0                        ; base high
+
 gdt_end:                        ; Used to calculate the size of the GDT
 
 gdt_desc:                       ; The GDT descriptor
@@ -265,30 +270,38 @@ vid_info:
 .array 	dd 0
 ; padding
 
-times 460 - ($-$$) db 0
+times 438 - ($-$$) db 0
 
 
 
 [bits 32]
 
-realmodereturn:
+realmodejump:
+	mov eax, 20h
+	mov ds, eax
+	mov es, eax
+	mov fs, eax
+	mov gs, eax
+    jmp 0x18:realmodeenter
+
+[bits 16]
+realmodeenter:
 	cli
-	mov sp, 0x10
-	mov ax, 10h
+	mov eax, cr0
+	and eax, 0x7ffffffe
+	mov cr0, eax
+	jmp 0x0:kernelstart
+
+;[bits 16]
+kernelstart:
+    mov ax, 0x9000
 	mov ds, ax
 	mov es, ax
 	mov fs, ax
 	mov gs, ax
-	mov eax, cr0
-	and eax, 0x7ffffffe
-	mov cr0, eax
-	jmp word 08h:kernelstart
-[bits 16]
-kernelstart:
-	mov   sp, 0xe000
-	mov ax, 0x9000
 	mov ss, ax
-	jmp word	9020h:0
+	mov sp, 0xe000
+	jmp 9020h:0
 
 times 510 - ($-$$) db 0
 

@@ -2,7 +2,7 @@
 #include "crunch.h"
 #include "ext2.h"
 
-uint32_t HEAP = 	0x00200000;
+uint32_t HEAP = 	0x002000000;
 uint32_t HEAP_START;
 
 #define COMMAND_LINE_OFFSET 0x9000
@@ -63,9 +63,9 @@ void stage2_main(uint32_t* mem_info, vid_info* v) {
 
 	inode* kernel_inode = ext2_inode(1, kernel_inode_number);
 
-	char* kernel = ext2_read_file(kernel_inode);
+	char* kernel = ext2_read_file(kernel_inode, 1, 0, 0x90000);
 	unsigned int kernel_total_size = (kernel_inode->blocks / (4096/SECTOR_SIZE))*4096;
-	startbzImage(kernel, kernel_total_size);
+	startbzImage(kernel, kernel_total_size, kernel_inode);
 	
 	vga_puts("Error");
 	vga_putc('\n');
@@ -84,42 +84,18 @@ static void putpixel(unsigned char* screen, int x,int y, int color) {
 
 static void build_command_line(char *command_line, int auto_boot)
 {
-	//char *env_command_line;
 
-	command_line[0] = '\0';
+	strcpy(command_line, "console=ttyS0 root=/dev/sdb rootwait\0");
+	// command_line[0] = '\0';
 
-	strcat(command_line, "console=ttyS0 vga=normal mem=4G auto");
+	// strcat(command_line, "root=/dev/sda1 nokaslr");
 
-	
-
-	// env_command_line =  getenv("bootargs");
-
-	// /* set console= argument if we use a serial console */
-	// if (NULL == strstr(env_command_line, "console=")) {
-	// 	if (0==strcmp(getenv("stdout"), "serial")) {
-
-	// 		/* We seem to use serial console */
-	// 		sprintf(command_line, "console=ttyS0,%s ",
-	// 			 getenv("baudrate"));
-	// 	}
-	// }
-
-	// if (auto_boot) {
-	// 	strcat(command_line, "auto ");
-	// }
-
-	// if (NULL != env_command_line) {
-	// 	strcat(command_line, env_command_line);
-	// }
-
-
-	//printf("Kernel command line: \"%s\"\n", command_line);
 }
 
 
 
 // TODO: sanity checks on kernel size!!!
-void startbzImage(char* kernel, unsigned int kernel_total_size){
+void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_inode){
 	if((int16_t)(*(int16_t*)(kernel+0x01fe))!=(int16_t)0xaa55){
 		vga_puts("Invalid kernel magic.");
 		printx("kernel magic:", *(int16_t*)(kernel+0x01fe));
@@ -142,7 +118,7 @@ void startbzImage(char* kernel, unsigned int kernel_total_size){
 	printx("kernel setup size:", kernel_setup_size);
 	printx("kernel hook:", kernel_hook);
 
-	memcpy(kernel_setup_base, kernel, kernel_setup_size);
+	//memcpy(kernel_setup_base, kernel, kernel_setup_size);
 
 	*(uint16_t*)(kernel_setup_base + 0x1fa) = 0xFFFF; // Video mode
 
@@ -168,14 +144,23 @@ void startbzImage(char* kernel, unsigned int kernel_total_size){
 
 	build_command_line(kernel_setup_base + COMMAND_LINE_OFFSET, 0);
 
+	printx("block number:", (kernel_setup_size/4096) - 1);
+	printx("block offset:", 1);
 
-	memcpy(0x100000, kernel+kernel_setup_size, kernel_total_size-kernel_setup_size);
+	ext2_read_file(kernel_inode, (kernel_setup_size/4096) - 1, 1, kernel_setup_base+4096); // Read rest of header in memory (we already read first sector, so add 4k)
+
+	printx("block number:", (kernel_total_size - kernel_setup_size)/4096);
+	printx("block offset:", kernel_setup_size/4096);
+
+	ext2_read_file(kernel_inode, (kernel_total_size - kernel_setup_size)/4096, kernel_setup_size/4096, 0x100000); // Read compressed kernel at 1MB
+
+	//memcpy(0x100000, kernel+kernel_setup_size, kernel_total_size-kernel_setup_size);
 
 	vga_puts("Copied data");
 	vga_putc('\n');
-
+	vga_clear();
 	__asm__ volatile (
 		"xor %eax, %eax\n"
-		"ljmp	$0x08,$0x7dcc");
+		"ljmp	$0x08,$0x7db6");
 
 }

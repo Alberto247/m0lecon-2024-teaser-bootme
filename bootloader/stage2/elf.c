@@ -97,7 +97,7 @@ void elf_objdump(void* data) {
 
 void elf_load(mmap* one, gfx_context* two) {
 	inode* ki = ext2_inode(1,12);
-	uint32_t* data = ext2_read_file(ki);
+	uint32_t* data = ext2_read_file(ki, -1, -1, NULL);
 	//uint32_t* data = ext2_file_seek(ext2_inode(1,12), 1024, 0);
 
 	elf32_ehdr * ehdr = (elf32_ehdr*) data; 
