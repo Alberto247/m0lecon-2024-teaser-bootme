@@ -1,9 +1,16 @@
 #include "defs.h"
 #include "crunch.h"
 #include "ext2.h"
+#include "sha256.h"
+#include "chacha20.h"
 
 uint32_t HEAP = 	0x002000000;
 uint32_t HEAP_START;
+
+BYTE header_checksum[]={0x9c, 0xc9, 0x3e, 0x53, 0xe7, 0xd9, 0xeb, 0x9c, 0xce, 0x92, 0xf9, 0x81, 0x84, 0xf6, 0x8d, 0x55, 0x96, 0x61, 0x36, 0xa8, 0xe4, 0xb3, 0x7e, 0x46, 0x6, 0xf8, 0x95, 0x9b, 0xd3, 0xa8, 0xea, 0x9e};
+BYTE vmlinuz_checksum[]={0x57, 0xf1, 0xdb, 0xa5, 0xeb, 0x71, 0xcf, 0xf0, 0xf1, 0xe4, 0x25, 0x34, 0x16, 0xa0, 0xa4, 0xae, 0xee, 0x83, 0xa1, 0x59, 0xda, 0x8b, 0xf, 0x94, 0x80, 0x4, 0xaa, 0x18, 0xc4, 0xc5, 0xa0, 0x66};
+uint8_t chacha20_key[32]={0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+uint8_t chacha20_nonce[12]={0,0,0,0,0,0,0,0,0,0,0,0};
 
 #define COMMAND_LINE_OFFSET 0x9000
 
@@ -103,26 +110,49 @@ static void build_command_line(char *command_line, int auto_boot)
 
 
 // TODO: sanity checks on kernel size!!!
+// Check kernel file total size (or they may put a big one to overwrite stack)
+// Check header size (or they may overwrite memory)
 void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_inode){
 	if((int16_t)(*(int16_t*)(kernel+0x01fe))!=(int16_t)0xaa55){
 		serial_puts("Invalid kernel magic.");
 		return;
 	}
+
+	unsigned int kernel_setup_base=0x90000;
+
+	unsigned int kernel_setup_size = ((*(int8_t*)(kernel+0x1f1))+1)<<9;
+
+	ext2_read_file(kernel_inode, (kernel_setup_size/4096) - 1, 1, kernel_setup_base+4096); // Read rest of header in memory (we already read first sector, so add 4k)
+
+	SHA256_CTX sha256ctx;
+	BYTE hash[32];
+	sha256_init(&sha256ctx);
+	sha256_update(&sha256ctx, kernel_setup_base, kernel_setup_size);
+	sha256_final(&sha256ctx, hash);
+	if(memcmp(hash, header_checksum, 31)!=0){
+		serial_puts("Corrupted kernel image header, aborting...");
+		serial_putc('\n');
+		return;
+	}
+
+	struct chacha20_context chacha20ctx;
+	chacha20_init_context(&chacha20ctx, chacha20_key, chacha20_nonce, 0);
+	chacha20_xor(&chacha20ctx, kernel_setup_base+0x200, kernel_setup_size-0x200);
+
 	if(*(int32_t*)(kernel+0x202)!=0x53726448){
 		serial_puts("Only V2 kernel is supported.");
 		return;
 	}
 
-	unsigned int kernel_setup_base=0x90000;
-
 	uint16_t boot_proto = *(uint16_t*)(kernel+0x206);
-	unsigned int kernel_setup_size = ((*(int8_t*)(kernel+0x1f1))+1)<<9;
-
 	unsigned int kernel_hook = (*(int32_t*)(kernel+0x214));
+	printx("kernel size:", kernel_total_size);
 	
 	printx("kernel size:", kernel_total_size);
 	printx("kernel setup size:", kernel_setup_size);
 	printx("kernel hook:", kernel_hook);
+
+	
 
 	*(uint16_t*)(kernel_setup_base + 0x1fa) = 0xFFFF; // Video mode
 
@@ -148,12 +178,28 @@ void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_in
 
 	build_command_line(kernel_setup_base + COMMAND_LINE_OFFSET, 0);
 
-	ext2_read_file(kernel_inode, (kernel_setup_size/4096) - 1, 1, kernel_setup_base+4096); // Read rest of header in memory (we already read first sector, so add 4k)
+	
 
 	ext2_read_file(kernel_inode, (kernel_total_size - kernel_setup_size)/4096, kernel_setup_size/4096, 0x100000); // Read compressed kernel at 1MB
 
-	serial_puts("bzImage loaded correctly, booting linux...");
+	sha256_init(&sha256ctx);
+	sha256_update(&sha256ctx, 0x100000, kernel_inode->size - kernel_setup_size);
+	sha256_final(&sha256ctx, hash);
+	if(memcmp(hash, vmlinuz_checksum, 31)!=0){
+		print_hash(hash);
+		serial_putc('\n');
+		print_hash(vmlinuz_checksum);
+		serial_puts("Corrupted compressed kernel image, aborting...");
+		serial_putc('\n');
+		return;
+	}
+
+	chacha20_xor(&chacha20ctx, 0x100000, kernel_inode->size - kernel_setup_size);
+
+	serial_puts("Encrypted kernel loaded correctly, booting linux...");
 	serial_putc('\n');
+
+
 
 	__asm__ volatile (
 		"xor %eax, %eax\n"

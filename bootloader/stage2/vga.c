@@ -54,3 +54,14 @@ void serial_puts(char* s){
 		*s++;
 	}
 }
+
+void print_hash(uint8_t hash[]){
+	serial_puts(itoa(((uint32_t*)hash)[0], 16));
+	serial_puts(itoa(((uint32_t*)hash)[1], 16));
+	serial_puts(itoa(((uint32_t*)hash)[2], 16));
+	serial_puts(itoa(((uint32_t*)hash)[3], 16));
+	serial_puts(itoa(((uint32_t*)hash)[4], 16));
+	serial_puts(itoa(((uint32_t*)hash)[5], 16));
+	serial_puts(itoa(((uint32_t*)hash)[6], 16));
+	serial_puts(itoa(((uint32_t*)hash)[7], 16));
+}
