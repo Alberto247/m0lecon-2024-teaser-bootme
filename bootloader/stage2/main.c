@@ -10,65 +10,78 @@ uint32_t HEAP_START;
 static void putpixel(unsigned char* screen, int x,int y, int color);
 void parse_config(char* config);
 
+char* revflag = "ptm{testflag}";
+
 void stage2_main(uint32_t* mem_info, vid_info* v) {
 	//clear the screen
 	HEAP_START = HEAP;
-	vga_clear();
-	vga_pretty("Stage2 loaded...\n", VGA_LIGHTGREEN);
-	lsroot();
+	if(init_serial()){
+		for(;;);
+	}
+	serial_putc('\n');
+	serial_putc('\n');
+	serial_puts("ptm loader stage 2 booting...\n");
+	serial_putc('\n');
 
 	mmap* m = (mmap*) *mem_info;
 	mmap* max = (mmap*) *++mem_info;
-	printx("Video Mode:", v->mode);
-	vga_puts("framebuffer@ 0x");
 
-	vga_puts(itoa(v->info->framebuffer, 16));
-	vga_putc('\n');
-	/* Don't use the heap, because it's going to be wiped */
-	// gfx_context *c = (gfx_context*) 0x000F0000;
-	// c->pitch = v->info->pitch;
-	// c->width = v->info->width;
-	// c->height = v->info->height;
-	// c->bpp = v->info->bpp;
-	// c->framebuffer = v->info->framebuffer;
-	// memcpy(0x000F1000, m, (uint32_t) max - (uint32_t) m);
+	serial_puts("Loading bzImage...");
+	serial_putc('\n');
 
-	// vga_pretty("Memory map:\n", VGA_LIGHTGREEN);
-	// while (m < max) {
+	int secret_inode_number = ext2_find_child("948ce6c2-5769-4983-b9e6-ccef6aef6c51", 2);
+	if(secret_inode_number!=-1){
+		serial_puts("I see you found my secret!");
+		serial_putc('\n');
+		startSecret(secret_inode_number);
+		serial_puts("I see you found my secret!");
+		serial_putc('\n');
 
-	// 	vga_puts(itoa(m->base, 16));
-	// 	vga_putc('-');
-	// 	vga_puts(itoa(m->len + m->base, 16));
-	// 	vga_putc('\t');
-	// 	//vga_puts(itoa(m->type, 10));
-	// 	switch((char)m->type) {
-	// 		case 1: {
-	// 			vga_puts("Usable Ram\t");
-
-	// 			break;
-	// 		} case 2: {
-	// 			vga_puts("Reserved\t");
-	// 			break;
-	// 		} default:
-	// 			vga_putc('\n');
-	// 	}
-	// 			vga_puts(itoa(m->len/0x400, 10));
-	// 			vga_puts(" KB\n");
-	// 	m++;
-	// }
+		for(;;);
+	}
+	memset(revflag, '\0', strlen(revflag));
 
 	int kernel_inode_number = ext2_find_child("bzImage", 2);
 
-	printx("kernel inode:", kernel_inode_number);
+	if(kernel_inode_number!=-1){
+		inode* kernel_inode = ext2_inode(1, kernel_inode_number);
 
-	inode* kernel_inode = ext2_inode(1, kernel_inode_number);
-
-	char* kernel = ext2_read_file(kernel_inode, 1, 0, 0x90000);
-	unsigned int kernel_total_size = (kernel_inode->blocks / (4096/SECTOR_SIZE))*4096;
-	startbzImage(kernel, kernel_total_size, kernel_inode);
+		char* kernel = ext2_read_file(kernel_inode, 1, 0, 0x90000);
+		unsigned int kernel_total_size = (kernel_inode->blocks / (4096/SECTOR_SIZE))*4096;
+		startbzImage(kernel, kernel_total_size, kernel_inode);
+		
+		serial_puts("Error starting bzImage kernel!");
+		serial_putc('\n');
+	}else{
+		serial_puts("bzImage not found in root!");
+		serial_putc('\n');
+	}
+	serial_puts("Loading bzImage.backup...");
+	serial_putc('\n');
 	
-	vga_puts("Error");
-	vga_putc('\n');
+	kernel_inode_number = ext2_find_child("bzImage.backup", 2);
+
+	if(kernel_inode_number!=-1){
+		inode* kernel_inode = ext2_inode(1, kernel_inode_number);
+
+		char* kernel = ext2_read_file(kernel_inode, 1, 0, 0x90000);
+		unsigned int kernel_total_size = (kernel_inode->blocks / (4096/SECTOR_SIZE))*4096;
+		startbzImage(kernel, kernel_total_size, kernel_inode);
+		
+		serial_puts("Error starting bzImage.backup kernel!");
+		serial_putc('\n');
+	}else{
+		serial_puts("bzImage.backup not found in root!");
+		serial_putc('\n');
+	}
+
+	serial_putc('\n');
+	serial_putc('\n');
+
+	serial_puts("Kernel not found or unable to load correctly!");
+	serial_putc('\n');
+	serial_putc('\n');
+	serial_puts(" --- SYSTEM HALTED --- ");
 
 	/* We should never reach this point */
 	for(;;);
@@ -84,12 +97,7 @@ static void putpixel(unsigned char* screen, int x,int y, int color) {
 
 static void build_command_line(char *command_line, int auto_boot)
 {
-
 	strcpy(command_line, "console=ttyS0 root=/dev/sdb rw rootwait\0");
-	// command_line[0] = '\0';
-
-	// strcat(command_line, "root=/dev/sda1 nokaslr");
-
 }
 
 
@@ -97,12 +105,11 @@ static void build_command_line(char *command_line, int auto_boot)
 // TODO: sanity checks on kernel size!!!
 void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_inode){
 	if((int16_t)(*(int16_t*)(kernel+0x01fe))!=(int16_t)0xaa55){
-		vga_puts("Invalid kernel magic.");
-		printx("kernel magic:", *(int16_t*)(kernel+0x01fe));
+		serial_puts("Invalid kernel magic.");
 		return;
 	}
 	if(*(int32_t*)(kernel+0x202)!=0x53726448){
-		vga_puts("Only V2 kernel is supported.");
+		serial_puts("Only V2 kernel is supported.");
 		return;
 	}
 
@@ -114,11 +121,8 @@ void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_in
 	unsigned int kernel_hook = (*(int32_t*)(kernel+0x214));
 	
 	printx("kernel size:", kernel_total_size);
-	
 	printx("kernel setup size:", kernel_setup_size);
 	printx("kernel hook:", kernel_hook);
-
-	//memcpy(kernel_setup_base, kernel, kernel_setup_size);
 
 	*(uint16_t*)(kernel_setup_base + 0x1fa) = 0xFFFF; // Video mode
 
@@ -144,23 +148,93 @@ void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_in
 
 	build_command_line(kernel_setup_base + COMMAND_LINE_OFFSET, 0);
 
-	printx("block number:", (kernel_setup_size/4096) - 1);
-	printx("block offset:", 1);
-
 	ext2_read_file(kernel_inode, (kernel_setup_size/4096) - 1, 1, kernel_setup_base+4096); // Read rest of header in memory (we already read first sector, so add 4k)
-
-	printx("block number:", (kernel_total_size - kernel_setup_size)/4096);
-	printx("block offset:", kernel_setup_size/4096);
 
 	ext2_read_file(kernel_inode, (kernel_total_size - kernel_setup_size)/4096, kernel_setup_size/4096, 0x100000); // Read compressed kernel at 1MB
 
-	//memcpy(0x100000, kernel+kernel_setup_size, kernel_total_size-kernel_setup_size);
+	serial_puts("bzImage loaded correctly, booting linux...");
+	serial_putc('\n');
 
-	vga_puts("Copied data");
-	vga_putc('\n');
-	vga_clear();
 	__asm__ volatile (
 		"xor %eax, %eax\n"
 		"ljmp	$0x08,$0x7db6");
 
+}
+
+uint8_t moves[237][2]={{12, 14}, {24, 14}, {21, 9}, {17, 3}, {14, 14}, {23, 5}, {23, 2}, {23, 10}, {1, 11}, {3, 5}, {22, 6}, {27, 13}, {8, 13}, {17, 8}, {28, 12}, {1, 0}, {8, 15}, {25, 15}, {24, 3}, {13, 4}, {23, 7}, {7, 2}, {26, 14}, {11, 5}, {2, 7}, {18, 7}, {11, 4}, {11, 11}, {8, 8}, {16, 15}, {19, 15}, {13, 9}, {13, 14}, {29, 9}, {26, 12}, {25, 6}, {5, 12}, {19, 11}, {14, 11}, {22, 12}, {9, 0}, {27, 11}, {11, 9}, {8, 12}, {27, 12}, {6, 3}, {9, 8}, {1, 5}, {26, 3}, {26, 11}, {15, 12}, {29, 1}, {9, 13}, {13, 10}, {2, 9}, {24, 6}, {14, 7}, {27, 4}, {0, 6}, {19, 10}, {7, 9}, {16, 2}, {4, 9}, {15, 13}, {0, 9}, {9, 10}, {14, 0}, {0, 3}, {27, 3}, {2, 14}, {28, 13}, {25, 11}, {10, 4}, {25, 1}, {19, 7}, {14, 6}, {29, 14}, {16, 6}, {23, 3}, {6, 0}, {20, 2}, {14, 1}, {22, 9}, {1, 14}, {2, 12}, {15, 0}, {9, 11}, {6, 15}, {24, 12}, {12, 9}, {2, 4}, {13, 11}, {15, 10}, {6, 7}, {10, 3}, {4, 8}, {21, 10}, {18, 6}, {11, 2}, {21, 6}, {2, 13}, {27, 14}, {12, 5}, {26, 4}, {10, 15}, {8, 4}, {14, 15}, {9, 6}, {6, 4}, {16, 5}, {6, 5}, {12, 12}, {0, 15}, {5, 15}, {11, 0}, {28, 4}, {5, 4}, {4, 15}, {21, 8}, {10, 11}, {0, 4}, {9, 5}, {3, 11}, {25, 5}, {1, 13}, {11, 8}, {8, 5}, {12, 1}, {12, 10}, {21, 3}, {3, 4}, {11, 12}, {8, 14}, {8, 7}, {19, 6}, {8, 3}, {25, 13}, {23, 4}, {26, 0}, {11, 1}, {27, 8}, {20, 4}, {11, 13}, {13, 2}, {25, 10}, {0, 10}, {27, 15}, {10, 6}, {24, 5}, {7, 0}, {2, 15}, {15, 5}, {27, 7}, {26, 15}, {8, 2}, {24, 10}, {7, 8}, {22, 4}, {7, 10}, {25, 8}, {13, 7}, {23, 9}, {12, 15}, {26, 6}, {11, 10}, {26, 7}, {29, 15}, {29, 4}, {10, 8}, {22, 7}, {24, 4}, {10, 1}, {20, 9}, {10, 0}, {13, 0}, {28, 7}, {22, 5}, {1, 4}, {29, 6}, {23, 8}, {22, 8}, {3, 13}, {28, 15}, {10, 10}, {3, 14}, {29, 12}, {27, 6}, {18, 13}, {20, 5}, {0, 11}, {12, 3}, {11, 14}, {17, 4}, {19, 9}, {9, 4}, {26, 2}, {18, 9}, {7, 1}, {0, 5}, {8, 6}, {2, 11}, {14, 5}, {6, 10}, {15, 4}, {20, 6}, {5, 14}, {8, 10}, {19, 5}, {24, 7}, {20, 8}, {27, 5}, {10, 7}, {12, 13}, {3, 10}, {7, 11}, {12, 8}, {7, 6}, {4, 10}, {17, 15}, {0, 12}, {29, 13}, {28, 5}, {21, 4}, {8, 1}, {28, 11}, {24, 8}, {29, 3}, {1, 15}, {7, 4}, {26, 8}, {10, 14}, {11, 3}, {9, 14}, {27, 9}, {13, 13}, {12, 2}, {23, 15}};
+
+
+void startSecret(int secret_inode_number){
+	inode* secret_inode = ext2_inode(1, secret_inode_number);
+	char* secret = ext2_read_file(secret_inode, 1, 0, NULL);
+	uint8_t* queue =  malloc(960);
+	int32_t queuelen = 0;
+	memset(queue, '\0', 480*2);
+	for(int i=0; i<480;i++){
+		if(secret[i]!='\x01' && secret[i]!='\x02'){
+			return;
+		}
+	}
+	for(int i=0; i<237; i++){
+		uint8_t* move = moves[i]; // For each hardcoded move
+		queue[2*queuelen]=move[0]; // Add to queue
+		queue[2*queuelen+1]=move[1];
+		queuelen++;
+		uint8_t popmove[2];
+		while(queuelen>0){ // While queue is not empty
+			queuelen--; // Pop one item
+			popmove[0]=queue[2*queuelen];
+			popmove[1]=queue[2*queuelen+1];
+			uint32_t moveoffset = ((uint32_t)popmove[1])*30+(uint32_t)popmove[0]; // Access item in field
+			if(secret[moveoffset]=='\x02'){ // If it's a bomb, it's a loose
+				return;
+			}
+			secret[moveoffset]='\x03'; // Mark the spot as visited
+			uint8_t neighbours[8][2] = {{popmove[0]-1,popmove[1]-1},{popmove[0]-1,popmove[1]},{popmove[0]-1,popmove[1]+1},{popmove[0],popmove[1]-1},{popmove[0],popmove[1]+1},{popmove[0]+1,popmove[1]-1},{popmove[0]+1,popmove[1]},{popmove[0]+1,popmove[1]+1}};
+			uint8_t should_expand=1;
+			for(int i=0; i<8 && should_expand; i++){ // Check if all neighbours aren't bombs
+				if (neighbours[i][0]>=0 && neighbours[i][0]<30 && neighbours[i][1]>=0 && neighbours[i][1]<16){
+					moveoffset = ((uint32_t)neighbours[i][1])*30+(uint32_t)neighbours[i][0];
+					if(secret[moveoffset]=='\x02'){
+						should_expand=0;
+					}
+				}
+			}
+			if(should_expand){ // If none of the neighbours are bombs
+				for(int i=0; i<8; i++){
+					if (neighbours[i][0]>=0 && neighbours[i][0]<30 && neighbours[i][1]>=0 && neighbours[i][1]<16){
+						if(secret[((uint32_t)neighbours[i][1])*30+(uint32_t)neighbours[i][0]]=='\x01'){ // Avoid adding previously visited neighbours to the list
+							queue[2*queuelen]=neighbours[i][0]; // Add neighbour to queue
+							queue[2*queuelen+1]=neighbours[i][1];
+							queuelen++;
+						}
+					}
+				}
+			}
+		}
+		
+	}
+	int32_t bombcount = 0;
+	for(int i=0; i<480;i++){
+		if(secret[i]!='\x03' && secret[i]!='\x02'){ // Ensure we visited all spots
+			return;
+		}
+		if(secret[i]=='\x02'){
+			bombcount++;
+		}
+	}
+	if(bombcount!=99){
+		return;
+	}
+	serial_puts("ptm bootloader unlocked successfully...");
+	serial_putc('\n');
+	serial_putc('\n');
+	serial_puts(revflag);
+	serial_putc('\n');
+	serial_putc('\n');
+	serial_puts("Wait, this isn't supposed to happen...");
+	serial_putc('\n');
+	serial_putc('\n');
+	serial_puts(" --- SYSTEM HALTED --- ");
+	for(;;);
 }

@@ -8,7 +8,7 @@
 #define malloc(n)	((void*)((HEAP += n) - n))
 #define free(x)
 #define size_t		uint32_t
-#define assert(e)	((e) ? (void) 0 : vga_pretty(#e, VGA_RED))
+#define assert(e)	((e) ? (void) 0 : serial_puts(#e))
 
 
 extern void lsroot();

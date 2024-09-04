@@ -1,8 +1,7 @@
 COBJS	= 	stage2/main.o \
 			stage2/ext2.o \
 			stage2/lib.o \
-			stage2/vga.o \
-			stage2/elf.o
+			stage2/vga.o
 
 CC = gcc
 LD = ld

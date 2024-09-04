@@ -35,15 +35,6 @@ find it.
 
 int BLOCK_SIZE = 1024;
 
-// void stage2_main() {
-// 	//clear the screen
-// 	vga_clear();
-// 	vga_puts("Stage2 loaded...\n");
-// 	lsroot();
-
-// 	for(;;);
-// }
-
 
 
 /*
@@ -110,15 +101,15 @@ block_group_descriptor* ext2_blockdesc() {
 inode* ext2_inode(int dev, int i) {
 	superblock* s = ext2_superblock();
 	if(s==NULL){
-		vga_puts("Invalid ext2 drive");
-		vga_putc('\n');
+		serial_puts("Invalid ext2 drive");
+		serial_putc('\n');
 		for (;;);
 	}
 	BLOCK_SIZE = 1024 << s->log_block_size; 
-	printx("BLOCK_SIZE@: ", BLOCK_SIZE);
-	printx("s->log_block_size@: ", s->log_block_size);
+	//printx("BLOCK_SIZE@: ", BLOCK_SIZE);
+	//printx("s->log_block_size@: ", s->log_block_size);
 	block_group_descriptor* bgd = ext2_blockdesc();
-	printx("block_group_descriptor@: ", bgd);
+	//printx("block_group_descriptor@: ", bgd);
 
 	int block_group = (i - 1) / s->inodes_per_group; // block group #
 	int index 		= (i - 1) % s->inodes_per_group; // index into block group
@@ -162,8 +153,6 @@ void* ext2_read_file(inode* in, int block_number, int block_offset, char* buff) 
 		return NULL;
 
 	int num_blocks = in->blocks / (BLOCK_SIZE/SECTOR_SIZE);	
-
-	printx("num_blocks: ", num_blocks);
 
 	assert(num_blocks != 0);
 	if (!num_blocks) 
@@ -210,9 +199,9 @@ void* ext2_read_file(inode* in, int block_number, int block_offset, char* buff) 
 
 	num_blocks=block_number+block_offset; // Upper limit of our block
 
-	printx("indirect: ", indirect);
-	printx("doubleindirect: ", doubleindirect);
-	printx("tripleindirect: ", tripleindirect);
+	//printx("indirect: ", indirect);
+	//printx("doubleindirect: ", doubleindirect);
+	//printx("tripleindirect: ", tripleindirect);
 
 	//for(;;);
 
@@ -223,7 +212,6 @@ void* ext2_read_file(inode* in, int block_number, int block_offset, char* buff) 
 	int doubleindirectblockcache = -1;
 	int internal_offset = 0;
 	char* data;
-	char needle[] = {'\xDB', '\xB5', '\x3D', '\xB4', '\xF0', '\x1D', '\x1A', '\xD3', '\0'};
 	for (int i = block_offset; i < num_blocks; i++) { // We read from the offset to offset+number
 		if (i < 12) {
 			blocknum = in->block[i];
@@ -257,10 +245,6 @@ void* ext2_read_file(inode* in, int block_number, int block_offset, char* buff) 
 			}
 			blocknum = ext2_read_indirect(indirectblocknum, (internal_offset%((BLOCK_SIZE/4)*(BLOCK_SIZE/4)))%(BLOCK_SIZE/4));
 			char* data = buffer_read(blocknum);
-			if(memcmp(needle, data, 1)==0){
-				printx("find: ", i);
-				for(;;);
-			}
 			memcpy((uint32_t) buf + (((i-block_offset)) * BLOCK_SIZE), data, BLOCK_SIZE);
 		}
 
@@ -310,8 +294,8 @@ int ext2_find_child(const char* name, int dir_inode) {
 		// Calculate the 4byte aligned size of each entry
 		calc = (sizeof(dirent) + d->name_len + 4) & ~0x3;
 		sum += d->rec_len;
-		vga_puts(d->name);
-		vga_putc('\n');
+		//serial_puts(d->name);
+		//serial_putc('\n');
 		//printf("%2d  %10s\t%2d %3d\n", (int)d->inode, d->name, d->name_len, d->rec_len);
 		if (strncmp(d->name, name, d->name_len)== 0) {
 			
@@ -326,44 +310,44 @@ int ext2_find_child(const char* name, int dir_inode) {
 }
 
 
-void lsroot() {
-	vga_puts("lsroot");
-	inode* i = ext2_inode(1, 2);			// Root directory
+// void lsroot() {
+// 	serial_puts("lsroot");
+// 	inode* i = ext2_inode(1, 2);			// Root directory
 
-	char* buf = malloc(BLOCK_SIZE*i->blocks/2);
-	printx("Inode@: ", i);
+// 	char* buf = malloc(BLOCK_SIZE*i->blocks/2);
+// 	printx("Inode@: ", i);
 
-	for (int q = 0; q < i->blocks / 2; q++) {
-		printx("Block: ", i->block[q]);
-		char* data = buffer_read(i->block[q]);
-		memcpy((uint32_t)buf+(q * BLOCK_SIZE), data, BLOCK_SIZE);
-	}
+// 	for (int q = 0; q < i->blocks / 2; q++) {
+// 		printx("Block: ", i->block[q]);
+// 		char* data = buffer_read(i->block[q]);
+// 		memcpy((uint32_t)buf+(q * BLOCK_SIZE), data, BLOCK_SIZE);
+// 	}
 
-	dirent* d = (dirent*) buf;
+// 	dirent* d = (dirent*) buf;
 
-	int sum = 0;
-	int calc = 0;
-	vga_puts("Root directory:\n");
-	do {
+// 	int sum = 0;
+// 	int calc = 0;
+// 	serial_puts("Root directory:\n");
+// 	do {
 		
-		// Calculate the 4byte aligned size of each entry
-		calc = (sizeof(dirent) + d->name_len + 4) & ~0x3;
-		sum += d->rec_len;
-		vga_puts("/");
-		vga_puts(d->name);
-		vga_putc('\n');
-		if (d->rec_len != calc && sum == 1024) {
-			/* if the calculated value doesn't match the given value,
-			then we've reached the final entry on the block */
-			//sum -= d->rec_len;
-			d->rec_len = calc; 		// Resize this entry to it's real size
-		//	d = (dirent*)((uint32_t) d + d->rec_len);
-		}
+// 		// Calculate the 4byte aligned size of each entry
+// 		calc = (sizeof(dirent) + d->name_len + 4) & ~0x3;
+// 		sum += d->rec_len;
+// 		serial_puts("/");
+// 		serial_puts(d->name);
+// 		serial_putc('\n');
+// 		if (d->rec_len != calc && sum == 1024) {
+// 			/* if the calculated value doesn't match the given value,
+// 			then we've reached the final entry on the block */
+// 			//sum -= d->rec_len;
+// 			d->rec_len = calc; 		// Resize this entry to it's real size
+// 		//	d = (dirent*)((uint32_t) d + d->rec_len);
+// 		}
 
-		d = (dirent*)((uint32_t) d + d->rec_len);
+// 		d = (dirent*)((uint32_t) d + d->rec_len);
 
 
-	} while(sum < 1024);
-	return NULL;
-}
+// 	} while(sum < 1024);
+// 	return NULL;
+// }
 
