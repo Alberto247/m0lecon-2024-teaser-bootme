@@ -11,7 +11,7 @@
 #define assert(e)	((e) ? (void) 0 : serial_puts(#e))
 
 
-extern void lsroot();
+extern void lsdir(int node);
 
 extern char* itoa(uint32_t num, int base);
 extern void putx(char* msg, uint32_t i);

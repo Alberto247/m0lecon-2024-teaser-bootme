@@ -6,6 +6,7 @@
 [ -d /run ] || mkdir /run
 [ -d /root ] || mkdir /root
 [ -d /etc ] || mkdir /etc
+[ -d /etc/sudoers.d ] || mkdir /etc/sudoers.d
 [ -d /home ] || mkdir /home
 
 echo 'root:x:0:0:root:/root:/bin/sh' > /etc/passwd
@@ -15,11 +16,11 @@ chmod 644 /etc/group
 
 adduser user --disabled-password -H 2>/dev/null
 
-mkdir /jail
 chown -R root:root /
-chown user:user /jail
+chown user:user /boot
 chmod 700 -R /root
 chmod 777 /tmp
+chmod 777 /boot
 chmod 755 /dev
 
 mount -t sysfs -o nodev,noexec,nosuid sysfs /sys
@@ -30,5 +31,18 @@ mount -t devtmpfs -o nosuid,mode=0755 udev /dev
 mkdir -p /dev/pts
 mkdir -p /var/lock
 mount -t devpts -o noexec,nosuid,gid=5,mode=0620 devpts /dev/pts || true
+
+echo 1 > /proc/sys/kernel/kptr_restrict
+echo 1 > /proc/sys/kernel/perf_event_paranoid
+echo 1 > /proc/sys/kernel/dmesg_restrict
+
+setsid /bin/cttyhack setuidgid user /bin/sh
+
+if [ -f '/boot/shutdown.next' ]; then
+   poweroff -d 1 -n -f
+else
+   touch /boot/shutdown.next
+   reboot now
+fi
 
 

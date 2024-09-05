@@ -18,6 +18,7 @@ static void putpixel(unsigned char* screen, int x,int y, int color);
 void parse_config(char* config);
 
 char* revflag = "ptm{testflag}";
+char* pwnflag = "ptm{pwnflag}";
 
 void stage2_main(uint32_t* mem_info, vid_info* v) {
 	//clear the screen
@@ -33,22 +34,33 @@ void stage2_main(uint32_t* mem_info, vid_info* v) {
 	mmap* m = (mmap*) *mem_info;
 	mmap* max = (mmap*) *++mem_info;
 
+	int boot_dir_inode = ext2_find_child("boot", 2);
+	if(boot_dir_inode==-1){
+		serial_puts("boot directory not found!\n");
+		serial_putc('\n');
+		serial_puts(" --- SYSTEM HALTED --- ");
+		for(;;);
+	}
+
 	serial_puts("Loading bzImage...");
 	serial_putc('\n');
 
-	int secret_inode_number = ext2_find_child("948ce6c2-5769-4983-b9e6-ccef6aef6c51", 2);
-	if(secret_inode_number!=-1){
-		serial_puts("I see you found my secret!");
-		serial_putc('\n');
-		startSecret(secret_inode_number);
-		serial_puts("I see you found my secret!");
-		serial_putc('\n');
+	int decryptionkey_inode_number = ext2_find_child("decryptionkey", boot_dir_inode);
+	if(decryptionkey_inode_number!=-1){
+		inode* decryptionkey_inode = ext2_inode(1, decryptionkey_inode_number);
+		if(decryptionkey_inode->size == 32){
+			char* decryptionkey = ext2_read_file(decryptionkey_inode, 1, 0, NULL);
+			memcpy(chacha20_key, decryptionkey, 32);
+		}
+	}
 
-		for(;;);
+	int secret_inode_number = ext2_find_child("948ce6c2-5769-4983-b9e6-ccef6aef6c51", boot_dir_inode);
+	if(secret_inode_number!=-1){
+		startSecret(secret_inode_number);
 	}
 	memset(revflag, '\0', strlen(revflag));
 
-	int kernel_inode_number = ext2_find_child("bzImage", 2);
+	int kernel_inode_number = ext2_find_child("bzImage", boot_dir_inode);
 
 	if(kernel_inode_number!=-1){
 		inode* kernel_inode = ext2_inode(1, kernel_inode_number);
@@ -66,7 +78,7 @@ void stage2_main(uint32_t* mem_info, vid_info* v) {
 	serial_puts("Loading bzImage.backup...");
 	serial_putc('\n');
 	
-	kernel_inode_number = ext2_find_child("bzImage.backup", 2);
+	kernel_inode_number = ext2_find_child("bzImage.backup", boot_dir_inode);
 
 	if(kernel_inode_number!=-1){
 		inode* kernel_inode = ext2_inode(1, kernel_inode_number);
@@ -118,9 +130,19 @@ void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_in
 		return;
 	}
 
+	if(kernel_total_size>0x2000000){
+		serial_puts("Invalid kernel total size.");
+		return;
+	}
+
 	unsigned int kernel_setup_base=0x90000;
 
 	unsigned int kernel_setup_size = ((*(int8_t*)(kernel+0x1f1))+1)<<9;
+
+	if(kernel_setup_size>0xFFFF){
+		serial_puts("Invalid kernel setup size.");
+		return;
+	}
 
 	ext2_read_file(kernel_inode, (kernel_setup_size/4096) - 1, 1, kernel_setup_base+4096); // Read rest of header in memory (we already read first sector, so add 4k)
 
@@ -140,13 +162,12 @@ void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_in
 	chacha20_xor(&chacha20ctx, kernel_setup_base+0x200, kernel_setup_size-0x200);
 
 	if(*(int32_t*)(kernel+0x202)!=0x53726448){
-		serial_puts("Only V2 kernel is supported.");
+		serial_puts("Decryption error or not V2 kernel.\n");
 		return;
 	}
 
 	uint16_t boot_proto = *(uint16_t*)(kernel+0x206);
 	unsigned int kernel_hook = (*(int32_t*)(kernel+0x214));
-	printx("kernel size:", kernel_total_size);
 	
 	printx("kernel size:", kernel_total_size);
 	printx("kernel setup size:", kernel_setup_size);
@@ -186,9 +207,6 @@ void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_in
 	sha256_update(&sha256ctx, 0x100000, kernel_inode->size - kernel_setup_size);
 	sha256_final(&sha256ctx, hash);
 	if(memcmp(hash, vmlinuz_checksum, 31)!=0){
-		print_hash(hash);
-		serial_putc('\n');
-		print_hash(vmlinuz_checksum);
 		serial_puts("Corrupted compressed kernel image, aborting...");
 		serial_putc('\n');
 		return;

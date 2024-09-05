@@ -294,8 +294,6 @@ int ext2_find_child(const char* name, int dir_inode) {
 		// Calculate the 4byte aligned size of each entry
 		calc = (sizeof(dirent) + d->name_len + 4) & ~0x3;
 		sum += d->rec_len;
-		//serial_puts(d->name);
-		//serial_putc('\n');
 		//printf("%2d  %10s\t%2d %3d\n", (int)d->inode, d->name, d->name_len, d->rec_len);
 		if (strncmp(d->name, name, d->name_len)== 0) {
 			
@@ -310,44 +308,44 @@ int ext2_find_child(const char* name, int dir_inode) {
 }
 
 
-// void lsroot() {
-// 	serial_puts("lsroot");
-// 	inode* i = ext2_inode(1, 2);			// Root directory
+void lsdir(int node) {
+	serial_puts("lsdir");
+	inode* i = ext2_inode(1, node);			// Directory
 
-// 	char* buf = malloc(BLOCK_SIZE*i->blocks/2);
-// 	printx("Inode@: ", i);
+	char* buf = malloc(BLOCK_SIZE*i->blocks/2);
+	printx("Inode@: ", i);
 
-// 	for (int q = 0; q < i->blocks / 2; q++) {
-// 		printx("Block: ", i->block[q]);
-// 		char* data = buffer_read(i->block[q]);
-// 		memcpy((uint32_t)buf+(q * BLOCK_SIZE), data, BLOCK_SIZE);
-// 	}
+	for (int q = 0; q < i->blocks / 2; q++) {
+		printx("Block: ", i->block[q]);
+		char* data = buffer_read(i->block[q]);
+		memcpy((uint32_t)buf+(q * BLOCK_SIZE), data, BLOCK_SIZE);
+	}
 
-// 	dirent* d = (dirent*) buf;
+	dirent* d = (dirent*) buf;
 
-// 	int sum = 0;
-// 	int calc = 0;
-// 	serial_puts("Root directory:\n");
-// 	do {
+	int sum = 0;
+	int calc = 0;
+	serial_puts("Directory:\n");
+	do {
 		
-// 		// Calculate the 4byte aligned size of each entry
-// 		calc = (sizeof(dirent) + d->name_len + 4) & ~0x3;
-// 		sum += d->rec_len;
-// 		serial_puts("/");
-// 		serial_puts(d->name);
-// 		serial_putc('\n');
-// 		if (d->rec_len != calc && sum == 1024) {
-// 			/* if the calculated value doesn't match the given value,
-// 			then we've reached the final entry on the block */
-// 			//sum -= d->rec_len;
-// 			d->rec_len = calc; 		// Resize this entry to it's real size
-// 		//	d = (dirent*)((uint32_t) d + d->rec_len);
-// 		}
+		// Calculate the 4byte aligned size of each entry
+		calc = (sizeof(dirent) + d->name_len + 4) & ~0x3;
+		sum += d->rec_len;
+		serial_puts("/");
+		serial_puts(d->name);
+		serial_putc('\n');
+		if (d->rec_len != calc && sum == 1024) {
+			/* if the calculated value doesn't match the given value,
+			then we've reached the final entry on the block */
+			//sum -= d->rec_len;
+			d->rec_len = calc; 		// Resize this entry to it's real size
+		//	d = (dirent*)((uint32_t) d + d->rec_len);
+		}
 
-// 		d = (dirent*)((uint32_t) d + d->rec_len);
+		d = (dirent*)((uint32_t) d + d->rec_len);
 
 
-// 	} while(sum < 1024);
-// 	return NULL;
-// }
+	} while(sum < 1024);
+	return NULL;
+}
 
