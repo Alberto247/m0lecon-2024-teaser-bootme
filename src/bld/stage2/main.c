@@ -161,11 +161,6 @@ void startbzImage(char* kernel, unsigned int kernel_total_size, inode* kernel_in
 	chacha20_init_context(&chacha20ctx, chacha20_key, chacha20_nonce, 0);
 	chacha20_xor(&chacha20ctx, kernel_setup_base+0x200, kernel_setup_size-0x200);
 
-	if(*(int32_t*)(kernel+0x202)!=0x53726448){
-		serial_puts("Decryption error or not V2 kernel.\n");
-		return;
-	}
-
 	uint16_t boot_proto = *(uint16_t*)(kernel+0x206);
 	unsigned int kernel_hook = (*(int32_t*)(kernel+0x214));
 	
