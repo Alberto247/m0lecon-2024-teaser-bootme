@@ -1,0 +1,25 @@
+revchall = {
+    "challengeName" : "bootme",
+    "flag" : "ptm{n0w_w3_c4n_play_3ven_1n_4_b00tload3r!}",
+    "description" : "Why would I write userspace or kernel code when I can write REAL code?",
+    "categories" : ["reverse"],
+    "challengeType" : "dynamic",
+    "maxValue" : 500,
+    "minValue" : 50,
+    "decay" : 10,
+    "challPos" : 1,
+    "attachments" : [{"name":"pippo", "link":"https://m0lecon.it/"}, {"name":"pippo2", "link":"https://m0lecon.it/"}]
+}
+
+pwnchall = {
+    "challengeName" : "bootme 2",
+    "flag" : "ptm{d0es_r3al_m0de_l00k_r3al_en0ugh_f0r_you?}",
+    "description" : "It took me a while to write this. Can you pwn it in less?",
+    "categories" : ["pwn"],
+    "challengeType" : "dynamic",
+    "maxValue" : 500,
+    "minValue" : 50,
+    "decay" : 10,
+    "challPos" : 1,
+    "attachments" : [{"name":"pippo", "link":"https://m0lecon.it/"}, {"name":"pippo2", "link":"https://m0lecon.it/"}]
+}
