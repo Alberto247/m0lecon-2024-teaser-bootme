@@ -1,0 +1,18 @@
+
+
+services:
+    bootme:
+      build: .
+      ports:
+        - 1337:1337
+      volumes:
+        - ./instances:/instances
+    cleaner:
+      build: ./dedcleaner
+      restart: unless-stopped
+      volumes:
+        - ./instances:/instances
+      environment:
+        - DELETE_AFTER=10m
+        - SLEEP=5m
+        - DIRS=/instances/**/*

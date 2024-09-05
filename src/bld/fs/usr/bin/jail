@@ -1,0 +1,25 @@
+#!/bin/sh
+
+echo """kkkkkkkk              SSSSSSSSSSSSSSS MMMMMMMM               MMMMMMMM   SSSSSSSSSSSSSSS 
+k::::::k            SS:::::::::::::::SM:::::::M             M:::::::M SS:::::::::::::::S
+k::::::k           S:::::SSSSSS::::::SM::::::::M           M::::::::MS:::::SSSSSS::::::S
+k::::::k           S:::::S     SSSSSSSM:::::::::M         M:::::::::MS:::::S     SSSSSSS
+ k:::::k    kkkkkkkS:::::S            M::::::::::M       M::::::::::MS:::::S            
+ k:::::k   k:::::k S:::::S            M:::::::::::M     M:::::::::::MS:::::S            
+ k:::::k  k:::::k   S::::SSSS         M:::::::M::::M   M::::M:::::::M S::::SSSS         
+ k:::::k k:::::k     SS::::::SSSSS    M::::::M M::::M M::::M M::::::M  SS::::::SSSSS    
+ k::::::k:::::k        SSS::::::::SS  M::::::M  M::::M::::M  M::::::M    SSS::::::::SS  
+ k:::::::::::k            SSSSSS::::S M::::::M   M:::::::M   M::::::M       SSSSSS::::S 
+ k:::::::::::k                 S:::::SM::::::M    M:::::M    M::::::M            S:::::S
+ k::::::k:::::k                S:::::SM::::::M     MMMMM     M::::::M            S:::::S
+k::::::k k:::::k   SSSSSSS     S:::::SM::::::M               M::::::MSSSSSSS     S:::::S
+k::::::k  k:::::k  S::::::SSSSSS:::::SM::::::M               M::::::MS::::::SSSSSS:::::S
+k::::::k   k:::::k S:::::::::::::::SS M::::::M               M::::::MS:::::::::::::::SS 
+kkkkkkkk    kkkkkkk SSSSSSSSSSSSSSS   MMMMMMMM               MMMMMMMM SSSSSSSSSSSSSSS   
+
+Good luck... 🥲
+"""
+
+/usr/bin/nsjail --config /etc/nsjail/nsjail.conf --rlimit_nproc 5
+
+echo "Bye"

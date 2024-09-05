@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "ext2.h": "c",
+        "crunch.h": "c",
+        "chacha20.h": "c",
+        "defs.h": "c"
+    }
+}
