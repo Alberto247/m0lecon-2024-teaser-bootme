@@ -172,6 +172,10 @@ int memcmp(const uint8_t* s1, const uint8_t* s2, size_t n) {
 		s1++;
 		s2++;
 	}
+	if ( n == 0 )
+    {
+        return 0;
+    }
 	return ( *(uint8_t*)s1 - *(uint8_t*)s2 );
 }
 
@@ -196,6 +200,13 @@ char* strtok(char* s, const char* delim) {
 		return b;
 	}
 	return NULL;
+}
+
+void shutdown(){
+	serial_putc('\n');
+	serial_putc('\n');
+	outb(0x604, 0x2000);
+	for(;;);
 }
 
 inline uint8_t inb(uint16_t port) {
